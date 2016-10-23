@@ -699,8 +699,18 @@ class StrategyBase:
             #        but this may take some work in the iterator and gets tricky when
             #        we consider the ability of meta tasks to flush handlers
             for handler in handler_block.block:
+                handler_vars = self._variable_manager.get_vars(loader=self._loader, play=iterator._play, task=handler)                
+                templar = Templar(loader=self._loader, variables=handler_vars)
+                try:
+                    handler_name = templar.template(handler.name)
+                except (UndefinedError, AnsibleUndefinedVariable):
+                    # We skip this handler due to the fact that it may be using
+                    # a variable in the name that was conditionally included via
+                    # set_fact or some other method, and we don't want to error
+                    # out unnecessarily
+                    continue
                 if handler in self._notified_handlers and len(self._notified_handlers[handler]):
-                    result = self._do_handler_run(handler, handler.get_name(), iterator=iterator, play_context=play_context)
+                    result = self._do_handler_run(handler, handler_name, iterator=iterator, play_context=play_context)
                     if not result:
                         break
         return result
